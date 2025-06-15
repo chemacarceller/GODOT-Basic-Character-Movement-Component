@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3 uid="uid://bxeu4tsp3s7rv"]
+
+[ext_resource type="Script" uid="uid://bxxddenpy4w4y" path="res://Utils/Components/Movements/basic_character_movement_chb.gd" id="1_cdjec"]
+
+[node name="BasicCharacterMovement" type="Node"]
+script = ExtResource("1_cdjec")
+left_input = "ui_left"
+right_input = "ui_right"
+front_input = "ui_up"
+rear_input = "ui_down"
+jump_input = "ui_accept"
