@@ -37,6 +37,24 @@ class_name BasicCharacterMovementComponent extends Node
 	get():
 		return isEnabled
 
+@export_group("Character settings")
+
+# Specifies the character mass for calculating the impulse force
+## Specifies the character mass for calculating the impulse force
+@export_range(25,150) var characterMass : float = 75.0 :
+	set (value):
+		characterMass=value
+	get():
+		return characterMass
+
+# Specifies the characterForceFactor for calculating the impulse force
+## Specifies the character mass for calculating the impulse force
+@export_range(0.1,10) var characterForceFactor : float = 1 :
+	set (value):
+		characterForceFactor=value
+	get():
+		return characterForceFactor
+
 
 # Exported variables Inputs as public accessed with properties set/get methods
 @export_group("Components and properties")
@@ -56,22 +74,6 @@ class_name BasicCharacterMovementComponent extends Node
 		directionalObject=value
 	get():
 		return directionalObject
-
-# Specifies the character mass for calculating the impulse force
-## Specifies the character mass for calculating the impulse force
-@export_range(25,150) var characterMass : float = 75.0 :
-	set (value):
-		characterMass=value
-	get():
-		return characterMass
-
-# Specifies the characterForceFactor for calculating the impulse force
-## Specifies the character mass for calculating the impulse force
-@export_range(0.1,10) var characterForceFactor : float = 1 :
-	set (value):
-		characterForceFactor=value
-	get():
-		return characterForceFactor
 
 @export_group("Input actions setting")
 
@@ -362,11 +364,10 @@ func _physics_process(delta: float) -> void:
 			_myCharacter.velocity.z = move_toward(_myCharacter.velocity.z, 0, delta * _speed / decelerationSpeed)
 
 		# Doing the movement
-		# If there is a collission we push the rigidbodies involved
-		_pushAwwayRigidbody()
-
-		# used the method move_and_slide from CharacterBody3D node
-		_myCharacter.move_and_slide()
+		# Using the method move_and_slide from CharacterBody3D node
+		if _myCharacter.move_and_slide() :
+			# If there is a collission we push the rigidbodies involved in the collision
+			_pushAwwayRigidbody()
 
 
 func _rotateArmature(armatureComponent : Node3D, oldRotationAngle : float, newRotationAngle : float, delta : float) -> void:
