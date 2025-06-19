@@ -47,8 +47,8 @@ class_name BasicCharacterMovementComponent extends Node
 	get():
 		return characterMass
 
-# Specifies the characterForceFactor for calculating the impulse force
-## Specifies the character mass for calculating the impulse force
+# Specifies the characterForceFactor for calculating the impulse force, how strong is the character
+## Specifies the characterForceFactor for calculating the impulse force, how strong is the character
 @export_range(0.1,10) var characterForceFactor : float = 1 :
 	set (value):
 		characterForceFactor=value
@@ -136,8 +136,8 @@ class_name BasicCharacterMovementComponent extends Node
 	get():
 		return decelerationSpeed
 
-# How quickly the character changes direction in seg
-## How quickly the character changes direction in seg
+# How fast the character changes direction in seg
+## How fast the character changes direction in seg
 @export_range (0.001,2) var transitionSpeed : float = 0.2:
 	set (value):
 		transitionSpeed=value
@@ -219,7 +219,7 @@ var _oldSpeed : float = 0.0
 
 
 # Flags indicating different states of the movementcomponent
-# _isRuning indicates if the character is running or not, once set, it updates the speed
+# _isRuning indicates if the character is running or not
 # Two possibilities Runing or Walking
 var _isRuning : bool = false
 
@@ -275,7 +275,7 @@ func _physics_process(delta: float) -> void:
 	# Only if it is enabled
 	if isEnabled :
 
-		# Establishing direction of movement
+		# Establishing normalized direction of movement
 		if not _existLeftInput or not _existRightInput:
 			if _existFrontInput and _existRearInput :
 				# Only front and rear direction
@@ -308,7 +308,7 @@ func _physics_process(delta: float) -> void:
 			else:
 				_isJumping = false
 
-		# If inputs are present 
+		# If inputs are present, that means if a movement direction is set
 		if _direction :
 
 			#setting true the isMoving flag to indicate we are moving
@@ -328,7 +328,8 @@ func _physics_process(delta: float) -> void:
 			if not _isDoingRotation and abs(_offset)>PI/18000 and armature != null:
 				_rotateArmature(armature, -armature.rotation.y, _rotationAngle, delta)
 			
-			# Calculate the _speed it should move, only made if there is a change
+			# Calculate the _speed it should move, only made once if there is a speed change
+			# Kept the previous speed to calculate the diference for speed transitions
 			if (_speed != RUN_SPEED) and _isRuning:
 				_oldSpeed = _speed
 				_speed = RUN_SPEED
@@ -337,6 +338,7 @@ func _physics_process(delta: float) -> void:
 				_speed = WALK_SPEED
 
 			# By falling or jumping the _speed must be adjusted, only made once
+			# Kept the previous speed to calculate the diference for speed transitions
 			if (_isFalling):
 				if (_isRuning) and _speed != RUN_SPEED * SPEED_KEPT_BY_FALLING :
 					_oldSpeed = _speed
@@ -355,14 +357,15 @@ func _physics_process(delta: float) -> void:
 			# Speed to arrive when moving taken into account the direction
 			var _finalSpeed : Vector3 = _direction * _speed
 
-			# until the finalSpeed is arrived we increment the character's velocity
+			# until the finalSpeed is arrived we increment the character's velocity by a step depending on diference between speeds and the accelerationSpeed in seg independently from the pc characteristics (delta)
 			if (_myCharacter.velocity !=_finalSpeed) :
 				_myCharacter.velocity.x = move_toward(_myCharacter.velocity.x, _finalSpeed.x, delta * abs(_speed - _oldSpeed) / accelerationSpeed)
 				_myCharacter.velocity.z = move_toward(_myCharacter.velocity.z, _finalSpeed.z, delta * abs(_speed - _oldSpeed) / accelerationSpeed)
 
 		else:
 
-			# When there is no input the speed is set to 0.0
+			# When there is no input the speed is set to 0.0, only made once
+			# Kept the previous speed to calculate the diference for speed transitions
 			if _speed != 0.0 :
 				_oldSpeed = _speed
 				_speed = 0.0
@@ -374,6 +377,14 @@ func _physics_process(delta: float) -> void:
 			# We arrive the zero velocity by a factor of decelerationSpeed seconds
 			_myCharacter.velocity.x = move_toward(_myCharacter.velocity.x, 0, delta * abs(_speed - _oldSpeed)  / decelerationSpeed)
 			_myCharacter.velocity.z = move_toward(_myCharacter.velocity.z, 0, delta * abs(_speed - _oldSpeed) / decelerationSpeed)
+
+		# To avoid a weird reaction on character when pushes light objects i lock the y position
+		# when there is no need to move character up
+		# May be there is another way to avoid that, i dont know
+		if _isJumping or _isFalling or _myCharacter.get_floor_angle() > 0:
+			_myCharacter.axis_lock_linear_y = false
+		else :
+			_myCharacter.axis_lock_linear_y = true
 
 		# Doing the movement
 		# Using the method move_and_slide from CharacterBody3D node
