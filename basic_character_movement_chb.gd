@@ -25,7 +25,7 @@ class_name BasicCharacterMovementComponent extends Node
 
 
 ################################################################################################
-# E X P O R T E D   V A R I A B L E S
+#                               E X P O R T E D   V A R I A B L E S
 ################################################################################################
 
 
@@ -240,13 +240,6 @@ var _existLeftInput : bool = false
 var _existRightInput : bool = false
 var _existJumpInput : bool = false
 
-# Variables used for speed transition in process execution
-# Indicates the step to move each frame, calculated from accelerationSpeed/decelerationSpeed deltatime and distance to move
-var _step : float = 0.0
-# Indicates if the movement transition has ended, until a transition is not finished it cannot happened another
-var _endedTransition : bool = true
-
-
 func _ready() -> void:
 
 	# Warning message if the armature is null, continues without rotation
@@ -335,23 +328,16 @@ func _physics_process(delta: float) -> void:
 
 			# Speed to arrive when moving
 			var _finalSpeed : Vector3 = _direction * _speed
+
 			if (_isFalling):
 				_finalSpeed *= SPEED_KEPT_BY_FALLING
 			elif (_isJumping):
 				_finalSpeed *= SPEED_KEPT_BY_JUMPING
 
-			# if the previous transition is finished we do another one if the velocity must change
-			# calculating the step to move each frame from accelerationSpeed given in seconds
-			if (_endedTransition and _finalSpeed != _myCharacter.velocity) :
-				_endedTransition = false
-				_step = (delta * abs(_finalSpeed - _myCharacter.velocity).length()) / accelerationSpeed
-
 			# until the finalSpeed is arrived we increment the character's velocity
-			if (_myCharacter.velocity == _finalSpeed) :
-				_endedTransition = true
-			else :
-				_myCharacter.velocity.x = move_toward(_myCharacter.velocity.x, _finalSpeed.x, _step)
-				_myCharacter.velocity.z = move_toward(_myCharacter.velocity.z, _finalSpeed.z, _step)
+			if (_myCharacter.velocity !=_finalSpeed) :
+				_myCharacter.velocity.x = move_toward(_myCharacter.velocity.x, _finalSpeed.x, delta * _speed  / accelerationSpeed)
+				_myCharacter.velocity.z = move_toward(_myCharacter.velocity.z, _finalSpeed.z, delta * _speed  / accelerationSpeed)
 
 		else:
 
