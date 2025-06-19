@@ -213,6 +213,8 @@ class_name BasicCharacterMovementComponent extends Node
 @onready var _myCharacter : CharacterBody3D = get_parent()
 
 # _speed accesible from outside get and set method
+# The _oldSpeed is the speed before a speed change, it is used to know the difference in a speed change for the right transition time
+var _oldSpeed : float = 0.0
 @onready var _speed : float = RUN_SPEED if _isRuning else WALK_SPEED
 
 
@@ -317,7 +319,7 @@ func _physics_process(delta: float) -> void:
 
 			# The condition is to avoid crashing when the armature is not defined no movement is made
 			# _offset is the amount to rotate in the scope of 0 and 2*PI
-			var _offset : float = armature.rotation.y + _rotationAngle  if armature != null  else 0
+			var _offset : float = armature.rotation.y + _rotationAngle  if armature != null  else 0.0
 			if _offset >= 2*PI:
 				_offset -= 2*PI
 
@@ -325,29 +327,53 @@ func _physics_process(delta: float) -> void:
 			# If rotation offset is abova 1%, less than 1% doesnt call _rotateArmature
 			if not _isDoingRotation and abs(_offset)>PI/18000 and armature != null:
 				_rotateArmature(armature, -armature.rotation.y, _rotationAngle, delta)
+			
+			# Calculate the _speed it should move, only made if there is a change
+			if (_speed != RUN_SPEED) and _isRuning:
+				_oldSpeed = _speed
+				_speed = RUN_SPEED
+			elif (_speed != WALK_SPEED) and not _isRuning:
+				_oldSpeed = _speed
+				_speed = WALK_SPEED
 
-			# Speed to arrive when moving
-			var _finalSpeed : Vector3 = _direction * _speed
-
+			# By falling or jumping the _speed must be adjusted, only made once
 			if (_isFalling):
-				_finalSpeed *= SPEED_KEPT_BY_FALLING
+				if (_isRuning) and _speed != RUN_SPEED * SPEED_KEPT_BY_FALLING :
+					_oldSpeed = _speed
+					_speed = RUN_SPEED * SPEED_KEPT_BY_FALLING
+				elif (not _isRuning) and _speed != WALK_SPEED * SPEED_KEPT_BY_FALLING :
+					_oldSpeed = _speed
+					_speed = WALK_SPEED * SPEED_KEPT_BY_FALLING
 			elif (_isJumping):
-				_finalSpeed *= SPEED_KEPT_BY_JUMPING
+				if (_isRuning) and _speed != RUN_SPEED * SPEED_KEPT_BY_JUMPING :
+					_oldSpeed = _speed
+					_speed = RUN_SPEED * SPEED_KEPT_BY_JUMPING
+				elif (not _isRuning) and _speed != WALK_SPEED * SPEED_KEPT_BY_JUMPING :
+					_oldSpeed = _speed
+					_speed = WALK_SPEED * SPEED_KEPT_BY_JUMPING
+
+			# Speed to arrive when moving taken into account the direction
+			var _finalSpeed : Vector3 = _direction * _speed
 
 			# until the finalSpeed is arrived we increment the character's velocity
 			if (_myCharacter.velocity !=_finalSpeed) :
-				_myCharacter.velocity.x = move_toward(_myCharacter.velocity.x, _finalSpeed.x, delta * _speed  / accelerationSpeed)
-				_myCharacter.velocity.z = move_toward(_myCharacter.velocity.z, _finalSpeed.z, delta * _speed  / accelerationSpeed)
+				_myCharacter.velocity.x = move_toward(_myCharacter.velocity.x, _finalSpeed.x, delta * abs(_speed - _oldSpeed) / accelerationSpeed)
+				_myCharacter.velocity.z = move_toward(_myCharacter.velocity.z, _finalSpeed.z, delta * abs(_speed - _oldSpeed) / accelerationSpeed)
 
 		else:
+
+			# When there is no input the speed is set to 0.0
+			if _speed != 0.0 :
+				_oldSpeed = _speed
+				_speed = 0.0
 
 			# Setting to false the ismoving flag to indicate that there is no movement
 			set_isMoving(false)
 
 			# Deceleration when there is no input
 			# We arrive the zero velocity by a factor of decelerationSpeed seconds
-			_myCharacter.velocity.x = move_toward(_myCharacter.velocity.x, 0, delta * _speed  / decelerationSpeed)
-			_myCharacter.velocity.z = move_toward(_myCharacter.velocity.z, 0, delta * _speed / decelerationSpeed)
+			_myCharacter.velocity.x = move_toward(_myCharacter.velocity.x, 0, delta * abs(_speed - _oldSpeed)  / decelerationSpeed)
+			_myCharacter.velocity.z = move_toward(_myCharacter.velocity.z, 0, delta * abs(_speed - _oldSpeed) / decelerationSpeed)
 
 		# Doing the movement
 		# Using the method move_and_slide from CharacterBody3D node
@@ -472,7 +498,6 @@ func get_isRuning() -> bool:
 
 func set_isRuning(value : bool):
 	_isRuning = value
-	_speed = RUN_SPEED if _isRuning else WALK_SPEED
 
 func get_isPushing() -> bool:
 	return _isPushing
