@@ -294,7 +294,7 @@ func _physics_process(delta: float) -> void:
 		var _direction : Vector3 = directionalObject.transform.basis * Vector3(_inputDir.x, 0, _inputDir.y).normalized() if directionalObject != null else _myCharacter.transform.basis * Vector3(_inputDir.x, 0, _inputDir.y).normalized()
 
 		# Add the gravity for fall movement when detecting is not on floor
-		if not _myCharacter.is_on_floor():
+		if not _myCharacter.is_on_floor() and not _isJumping:
 			_myCharacter.velocity += _myCharacter.get_gravity() * delta
 			_isFalling = true
 		else:
@@ -305,7 +305,7 @@ func _physics_process(delta: float) -> void:
 			if Input.is_action_just_pressed(jumpInput) and _myCharacter.is_on_floor():
 				_myCharacter.velocity.y = JUMP_VELOCITY
 				_isJumping = true
-			else:
+			else :
 				_isJumping = false
 
 		# If inputs are present, that means if a movement direction is set
