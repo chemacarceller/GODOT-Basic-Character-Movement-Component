@@ -1,4 +1,3 @@
-@tool
 class_name BasicCharacterMovementComponent extends Node
 
 # Basic Character Movement Component
