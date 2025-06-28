@@ -22,6 +22,16 @@ class_name BasicCharacterMovementComponent extends Node
 # Gravity is also taken into account
 #
 
+# Movement state's options
+enum MOVEMENT_STATE {
+	IDLE,
+	WALKING,
+	RUNING,
+	JUMPING,
+	FALLING
+}
+
+
 
 ################################################################################################
 #                               E X P O R T E D   V A R I A B L E S
@@ -211,6 +221,9 @@ class_name BasicCharacterMovementComponent extends Node
 # _myCharacter without access outside because is the ParentActor
 @onready var _myCharacter : CharacterBody3D = get_parent()
 
+# State of the Character's movement used typically in animation tree
+var _state : MOVEMENT_STATE = MOVEMENT_STATE.IDLE
+
 # _speed accesible from outside get and set method
 # The _oldSpeed is the speed before a speed change, it is used to know the difference in a speed change for the right transition time
 var _oldSpeed : float = 0.0
@@ -222,13 +235,22 @@ var _oldSpeed : float = 0.0
 # Two possibilities Runing or Walking
 var _isRuning : bool = false
 
-# Indicates if the character is moving or idle useful for animations
+# Indicates if the character is moving or idle
 var _isMoving : bool = true
 
-# self-explanatory properties
+# self-explanatory propertie
+# _isPushing indicates it is pushing something not used as a movement state jet
 var _isPushing : bool = false
+
+# _isJumping indicates it is in the jumping process
 var _isJumping : bool = false
+# _Jumpkeypressed indicates that the jump key is pressed while on floor
+var _JumpKeyPressed : bool = false
+
+# _isFalling indicates it is in the falling process
 var _isFalling : bool = false
+
+# _idDoingRotation indicates it is doing the rotation
 var _isDoingRotation : bool = false
 
 # _inputDir : Vector generated from the inputs needed to character change
@@ -293,19 +315,41 @@ func _physics_process(delta: float) -> void:
 		var _direction : Vector3 = directionalObject.transform.basis * Vector3(_inputDir.x, 0, _inputDir.y).normalized() if directionalObject != null else _myCharacter.transform.basis * Vector3(_inputDir.x, 0, _inputDir.y).normalized()
 
 		# Add the gravity for fall movement when detecting is not on floor
-		if not _myCharacter.is_on_floor() and not _isJumping:
+		if not _myCharacter.is_on_floor() and not _JumpKeyPressed:
 			_myCharacter.velocity += _myCharacter.get_gravity() * delta
 			_isFalling = true
 		else:
 			_isFalling = false
+			# By ending the falling state we retrieve the previous movement state
+			if _isMoving:
+				_state = MOVEMENT_STATE.RUNING if _isRuning else MOVEMENT_STATE.WALKING
+			else:
+				_state = MOVEMENT_STATE.IDLE
+			
 
 		# Handling jump. We can only jump if we are on floor
 		if _existJumpInput:
 			if Input.is_action_just_pressed(jumpInput) and _myCharacter.is_on_floor():
 				_myCharacter.velocity.y = JUMP_VELOCITY
+				_JumpKeyPressed = true
 				_isJumping = true
 			else :
-				_isJumping = false
+				if _myCharacter.is_on_floor():
+					_isJumping = false
+				_JumpKeyPressed = false
+				# By ending the jumping state we retrieve the previous movement state
+				if _isMoving:
+					_state = MOVEMENT_STATE.RUNING if _isRuning else MOVEMENT_STATE.WALKING
+				else:
+					_state = MOVEMENT_STATE.IDLE
+
+		# Changing the movement state when falling. It must be set here bacause if not by falling and walking/runing
+		# doesnt return to walking/runing
+		if _isFalling :
+			_state = MOVEMENT_STATE.FALLING
+
+		if _isJumping :
+			_state = MOVEMENT_STATE.JUMPING
 
 		# If inputs are present, that means if a movement direction is set
 		if _direction :
@@ -345,7 +389,7 @@ func _physics_process(delta: float) -> void:
 				elif (not _isRuning) and _speed != WALK_SPEED * SPEED_KEPT_BY_FALLING :
 					_oldSpeed = _speed
 					_speed = WALK_SPEED * SPEED_KEPT_BY_FALLING
-			elif (_isJumping):
+			elif (_JumpKeyPressed):
 				if (_isRuning) and _speed != RUN_SPEED * SPEED_KEPT_BY_JUMPING :
 					_oldSpeed = _speed
 					_speed = RUN_SPEED * SPEED_KEPT_BY_JUMPING
@@ -369,13 +413,17 @@ func _physics_process(delta: float) -> void:
 				_oldSpeed = _speed
 				_speed = 0.0
 
-			# Setting to false the ismoving flag to indicate that there is no movement
-			set_isMoving(false)
-
 			# Deceleration when there is no input
 			# We arrive the zero velocity by a factor of decelerationSpeed seconds
-			_myCharacter.velocity.x = move_toward(_myCharacter.velocity.x, 0, delta * abs(_speed - _oldSpeed)  / decelerationSpeed)
-			_myCharacter.velocity.z = move_toward(_myCharacter.velocity.z, 0, delta * abs(_speed - _oldSpeed) / decelerationSpeed)
+			
+			if (_myCharacter.velocity != Vector3.ZERO) :
+				_myCharacter.velocity.x = move_toward(_myCharacter.velocity.x, 0, delta * abs(_speed - _oldSpeed)  / decelerationSpeed)
+				_myCharacter.velocity.z = move_toward(_myCharacter.velocity.z, 0, delta * abs(_speed - _oldSpeed) / decelerationSpeed)
+			else:
+				# Setting to false the ismoving flag to indicate that there is no movement
+				set_isMoving(false)
+				if not _isFalling and not _isJumping:
+					_state = MOVEMENT_STATE.IDLE
 
 		# To avoid a weird reaction on character when pushes light objects i lock the y position
 		# when there is no need to move character up
@@ -478,6 +526,10 @@ func _pushAwwayRigidbody() -> void :
 
 
 # PUBLIC API of this BasicCharacterComponent Getter and Setters methods
+
+# Returns the state of the character movement
+func get_state() -> MOVEMENT_STATE:
+	return _state
 
 # methods to check, start and stop the movement. For example to make an animation that requires to stop the movement
 func get_isMoving() -> bool :

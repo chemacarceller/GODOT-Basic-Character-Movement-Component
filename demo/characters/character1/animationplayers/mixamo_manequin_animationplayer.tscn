@@ -1,8 +1,0 @@
-[gd_scene load_steps=2 format=3 uid="uid://b22q7us6n8o1o"]
-
-[sub_resource type="AnimationLibrary" id="AnimationLibrary_8hkwb"]
-
-[node name="AnimationPlayer" type="AnimationPlayer"]
-libraries = {
-&"": SubResource("AnimationLibrary_8hkwb")
-}
