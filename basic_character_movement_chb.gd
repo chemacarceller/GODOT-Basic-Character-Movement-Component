@@ -308,8 +308,11 @@ func _physics_process(delta: float) -> void:
 				# Only front and rear direction
 				_inputDir = Vector2.DOWN * Input.get_axis(frontInput, rearInput)
 			else:
-				# None direction
-				_inputDir = Vector2.ZERO
+				if _existFrontInput :
+					_inputDir = -Vector2.DOWN * Input.get_action_strength(frontInput)
+				else :
+					# None direction
+					_inputDir = Vector2.ZERO
 		elif not _existFrontInput or not _existRearInput :
 			# Only left and right direction
 			_inputDir = Vector2.DOWN * Input.get_axis(leftInput, rightInput)
