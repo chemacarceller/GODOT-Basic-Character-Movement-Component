@@ -94,6 +94,10 @@ enum MOVEMENT_STATE {
 	get():
 		return leftInput
 
+# Indicates when the pawn turns left if it should rotate
+## Indicates when the pawn turns left if it should rotate
+@export var leftRotationEnabled : bool = true
+
 # Right movement input action
 ## Right movement input action
 @export var rightInput : String = "":
@@ -101,6 +105,10 @@ enum MOVEMENT_STATE {
 		rightInput=value
 	get():
 		return rightInput
+
+# Indicates when the pawn turns right if it should rotate
+## Indicates when the pawn turns right if it should rotate
+@export var rightRotationEnabled : bool = true
 
 # Front movement input action
 ## Front movement input action
@@ -110,6 +118,10 @@ enum MOVEMENT_STATE {
 	get():
 		return frontInput
 
+# Indicates when the pawn turns front if it should rotate
+## Indicates when the pawn turns front if it should rotate
+@export var frontRotationEnabled : bool = true
+
 # Rear movement input action
 ## Rear movement input action
 @export var rearInput : String = "":
@@ -117,6 +129,10 @@ enum MOVEMENT_STATE {
 		rearInput=value
 	get():
 		return rearInput
+
+# Indicates when the pawn turns rear if it should rotate
+## Indicates when the pawn turns rear if it should rotate
+@export var rearRotationEnabled : bool = true
 
 # Jump input action
 ## Jump input action
@@ -378,7 +394,8 @@ func _physics_process(delta: float) -> void:
 			# Calling corroutine to make a blend in rotation inside the _rotateArmature
 			# If rotation offset is abova 1%, less than 1% doesnt call _rotateArmature
 			if not _isDoingRotation and abs(_offset)>PI/18000 and armature != null:
-				_rotateArmature(armature, -armature.rotation.y, _rotationAngle, delta)
+				if (_inputDir == Vector2(-1,0) and leftRotationEnabled) or (_inputDir == Vector2(1,0) and rightRotationEnabled) or (_inputDir == Vector2(0,-1) and frontRotationEnabled) or (_inputDir == Vector2(0,1) and rearRotationEnabled) :
+					_rotateArmature(armature, -armature.rotation.y, _rotationAngle, delta)
 			
 			# Calculate the _speed it should move, only made once if there is a speed change
 			# Kept the previous speed to calculate the diference for speed transitions
