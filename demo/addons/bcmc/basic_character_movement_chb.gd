@@ -76,6 +76,12 @@ enum MOVEMENT_STATE {
 	get():
 		return armature
 
+
+# The list of collisionHulls of the character so that they are also rotated when the armature is totated.
+## The list of collisionHulls of the character so that they are also rotated when the armature is totated.
+@export var collisionHullsArray : Array[CollisionShape3D] = []
+
+
 # DirectionalObject is to set the Forward Direction
 ## A Node3D that indicates que forward vector for the movement component
 @export var directionalObject : Node3D = null:
@@ -502,6 +508,10 @@ func _rotateArmature(armatureComponent : Node3D, oldRotationAngle : float, newRo
 		# Rotation to apply in this frame
 		var x : float = lerp(oldRotationAngle,newRotationAngle, _step)
 		armatureComponent.rotation.y=-x
+		
+		for collisionHull in collisionHullsArray :
+			collisionHull.rotation = armatureComponent.rotation
+
 		# As it is used lerp the _step must be increased for the next frame
 		_step += delta / transitionSpeed
 
