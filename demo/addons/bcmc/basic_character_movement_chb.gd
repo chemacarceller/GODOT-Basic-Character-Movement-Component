@@ -81,6 +81,8 @@ enum MOVEMENT_STATE {
 ## The list of collisionHulls of the character so that they are also rotated when the armature is totated.
 @export var collisionHullsArray : Array[CollisionShape3D] = []
 
+# Internal variable storing the offsets of each collision shape relative to the armature, calculated in _ready()
+var _collisionHullsArrayOffset : Array[float] = []
 
 # DirectionalObject is to set the Forward Direction
 ## A Node3D that indicates que forward vector for the movement component
@@ -314,6 +316,12 @@ func _ready() -> void:
 		if jumpInput == action.get_basename():
 			_existJumpInput = true
 
+	# Calculated the offsets of each collision shape relative to the armature used for the rotation of collision shapes
+	var index : int = 0
+	for collisionHull in collisionHullsArray :
+		_collisionHullsArrayOffset.append(abs(Vector3(collisionHull.position.x - armature.position.x,0,collisionHull.position.z - armature.position.z).length()))
+		index += 1
+
 
 # Calculating the movement
 func _physics_process(delta: float) -> void:
@@ -508,9 +516,15 @@ func _rotateArmature(armatureComponent : Node3D, oldRotationAngle : float, newRo
 		# Rotation to apply in this frame
 		var x : float = lerp(oldRotationAngle,newRotationAngle, _step)
 		armatureComponent.rotation.y=-x
-		
+
+		# Also the shapes indicated must be rotated
+		var index : int = 0
 		for collisionHull in collisionHullsArray :
+			# The position of the shape calculation
+			collisionHull.position = -armatureComponent.basis.z.normalized() * _collisionHullsArrayOffset[index] + Vector3(0,collisionHull.position.y,0)
+			# The rotation of the shape calculation
 			collisionHull.rotation = armatureComponent.rotation
+			index += 1
 
 		# As it is used lerp the _step must be increased for the next frame
 		_step += delta / transitionSpeed
