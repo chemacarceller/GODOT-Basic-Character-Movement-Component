@@ -42,6 +42,17 @@ enum MOVEMENT_MODE {
 	TWOSPEEDS
 }
 
+# Indicates how the change in the direction is done:
+#  CONTINUOUS : The speed is kept
+#  FIFTY : Only the fifty percent os the speed is kept
+#  RESET : The speed is reset to ZERO
+# TRANSITIONED : The speed and direction of previous speed is not modified
+enum CHANGEDIRECTION_MODE {
+	CONTINOUS,
+	FIFTY,
+	RESET,
+	TRANSITIONED
+}
 
 
 ################################################################################################
@@ -182,7 +193,7 @@ var _collisionHullsArrayOffset : Array[float] = []
 
 
 
-@export_group("Transition speed settings")
+@export_group("Transition's settings")
 
 var _accelerationTime : float
 # How fast the character increases speed in m/seg
@@ -220,6 +231,17 @@ var _decelerationTime : float
 		transitionTime=value
 	get():
 		return transitionTime
+
+
+
+# Change Direction mode
+## Change Direction mode
+@export var changeDirectionMode : CHANGEDIRECTION_MODE = CHANGEDIRECTION_MODE.FIFTY :
+	set (value) :
+		changeDirectionMode = value
+		notify_property_list_changed()
+	get() :
+		return changeDirectionMode
 
 
 
@@ -359,19 +381,20 @@ var _isDoingRotation : bool = false
 
 
 # _inputDir : Vector generated from the inputs needed to character change
-var _inputDir : Vector2 = Vector2.ZERO
-
+# and the previous input, used to detect a direction change
+@onready var _inputDir : Vector2 = Vector2.ZERO
+@onready var _prevInput : Vector2 = Vector2.ZERO
 
 # Flags indicating if the input actions exist
-var _existFrontInput : bool = false
-var _existRearInput : bool = false
-var _existLeftInput : bool = false
-var _existRightInput : bool = false
-var _existJumpInput : bool = false
+@onready var _existFrontInput : bool = false
+@onready var _existRearInput : bool = false
+@onready var _existLeftInput : bool = false
+@onready var _existRightInput : bool = false
+@onready var _existJumpInput : bool = false
 
-# Stores the actual and the previous direction, used to detect a direction change
+# Stores the actual direction
 var _direction : Vector3 = Vector3.ZERO
-var _prevDirection : Vector3 = Vector3.ZERO
+
 
 
 
@@ -381,12 +404,9 @@ var _prevDirection : Vector3 = Vector3.ZERO
 #
 # ==========================================================================================
 
-# When a close notification is received
 func _notification(what):
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
-		armature = null
-		directionalObject = null
-		_myCharacter = null
+		queue_free()
 
 
 # BeginPlay funciton
@@ -447,22 +467,19 @@ func _physics_process(delta: float) -> void:
 					_inputDir = Vector2.ZERO
 		elif not _existFrontInput or not _existRearInput :
 			# Only left and right direction
-			_inputDir = Vector2.DOWN * Input.get_axis(leftInput, rightInput)
+			_inputDir = -Vector2.LEFT * Input.get_axis(leftInput, rightInput)
 		else:
 			# All directions
 			_inputDir = Input.get_vector(leftInput, rightInput, frontInput, rearInput)
 
 		# if there is no directionalObject defined we take the Character itself
 		_direction = directionalObject.transform.basis * Vector3(_inputDir.x, 0, _inputDir.y).normalized() if directionalObject != null else _myCharacter.transform.basis * Vector3(_inputDir.x, 0, _inputDir.y).normalized()
-
 		
 		# The direction change is detected when direction and previousdirection are different and it doesnt comes from being stopped
-		if _direction != _prevDirection and _prevDirection != Vector3.ZERO:
+		if _inputDir != _prevInput :
 			_changedDirection = true
-		else :
-			_prevDirection = _direction
-			
-		
+			_prevInput = _inputDir
+
 		# Add the gravity for fall movement when detecting is not on floor
 		if not _myCharacter.is_on_floor() and not _JumpKeyPressed:
 			_myCharacter.velocity += _myCharacter.get_gravity() * delta
@@ -555,8 +572,13 @@ func _physics_process(delta: float) -> void:
 
 				# If a changedDirection is detected and not is falling and not is jumping the velocity is set to the real speed so that it is not reduced or incremented via the accelerationSpeed or decelerationSpeed
 				# After that the bool variable changeDirection is set to false
-				if _changedDirection and not _isJumping and not _isFalling:
-					_myCharacter.velocity = _direction * _speed
+				if _changedDirection and not _isJumping and not _isFalling :
+					if changeDirectionMode == CHANGEDIRECTION_MODE.CONTINOUS :
+						_myCharacter.velocity = _direction * _speed
+					elif changeDirectionMode == CHANGEDIRECTION_MODE.FIFTY :
+						_myCharacter.velocity = _direction * _speed * 0.5
+					elif changeDirectionMode == CHANGEDIRECTION_MODE.RESET :
+						_myCharacter.velocity = Vector3.ZERO
 					_changedDirection = false
 
 				# Doing the speed increment via the accelerationSpeed
@@ -580,7 +602,7 @@ func _physics_process(delta: float) -> void:
 				_myCharacter.velocity.z = move_toward(_myCharacter.velocity.z, 0, delta * abs(_speed - _oldSpeed) / _decelerationTime)
 			else:
 				# Seting the previous direction that is Vector3.ZERO
-				_prevDirection = _direction
+				#_prevDirection = _direction
 				
 				# If bu decreasing the speed it arrives zero (it stops) the change direction flag is disabled
 				_changedDirection = false

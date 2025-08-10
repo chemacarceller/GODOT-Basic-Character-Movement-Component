@@ -15,5 +15,4 @@ func _unhandled_input(event) :
 	if event is InputEventKey and event.pressed :
 		match event.keycode :
 			KEY_ESCAPE :
-				get_tree().root.propagate_notification(NOTIFICATION_WM_CLOSE_REQUEST)
-				get_tree().quit()
+				get_tree().quit(0)

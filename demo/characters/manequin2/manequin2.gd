@@ -19,6 +19,8 @@ func _ready() -> void:
 	_movementComponent.armature = $Armature
 	_movementComponent.directionalObject = $SpringArm3D
 	
+	_movementComponent.accelerationSpeed = 6.0
+	
 	add_child(_movementComponent)
 
 func _input(event: InputEvent) -> void:
