@@ -383,7 +383,7 @@ var _isDoingRotation : bool = false
 # _inputDir : Vector generated from the inputs needed to character change
 # and the previous input, used to detect a direction change
 @onready var _inputDir : Vector2 = Vector2.ZERO
-@onready var _prevInput : Vector2 = Vector2.ZERO
+@onready var _prevDirection : Vector3 = Vector3.ZERO
 
 # Flags indicating if the input actions exist
 @onready var _existFrontInput : bool = false
@@ -454,45 +454,6 @@ func _physics_process(delta: float) -> void:
 	# Only if it is enabled
 	if isEnabled and _myCharacter != null:
 
-		# Establishing normalized direction of movement
-		if not _existLeftInput or not _existRightInput:
-			if _existFrontInput and _existRearInput :
-				# Only front and rear direction
-				_inputDir = Vector2.DOWN * Input.get_axis(frontInput, rearInput)
-			else:
-				if _existFrontInput :
-					_inputDir = -Vector2.DOWN * Input.get_action_strength(frontInput)
-				else :
-					# None direction
-					_inputDir = Vector2.ZERO
-		elif not _existFrontInput or not _existRearInput :
-			# Only left and right direction
-			_inputDir = -Vector2.LEFT * Input.get_axis(leftInput, rightInput)
-		else:
-			# All directions
-			_inputDir = Input.get_vector(leftInput, rightInput, frontInput, rearInput)
-
-		# if there is no directionalObject defined we take the Character itself
-		_direction = directionalObject.transform.basis * Vector3(_inputDir.x, 0, _inputDir.y).normalized() if directionalObject != null else _myCharacter.transform.basis * Vector3(_inputDir.x, 0, _inputDir.y).normalized()
-		
-		# The direction change is detected when direction and previousdirection are different and it doesnt comes from being stopped
-		if _inputDir != _prevInput :
-			_changedDirection = true
-			_prevInput = _inputDir
-
-		# Add the gravity for fall movement when detecting is not on floor
-		if not _myCharacter.is_on_floor() and not _JumpKeyPressed:
-			_myCharacter.velocity += _myCharacter.get_gravity() * delta
-			_isFalling = true
-		else:
-			_isFalling = false
-			# By ending the falling state we retrieve the previous movement state
-			if _isMoving:
-				_state = MOVEMENT_STATE.RUNING if _isRuning else MOVEMENT_STATE.WALKING
-			else:
-				_state = MOVEMENT_STATE.IDLE
-			
-
 		# Handling jump. We can only jump if we are on floor
 		if _existJumpInput:
 			if Input.is_action_just_pressed(jumpInput) and _myCharacter.is_on_floor():
@@ -500,22 +461,83 @@ func _physics_process(delta: float) -> void:
 				_JumpKeyPressed = true
 				_isJumping = true
 			else :
+				# when the character is on the floor he is not jumping
 				if _myCharacter.is_on_floor():
 					_isJumping = false
+				# the next frame after pressing the jump key the JumpKeyPressed is set to false
 				_JumpKeyPressed = false
+
 				# By ending the jumping state we retrieve the previous movement state
 				if _isMoving:
 					_state = MOVEMENT_STATE.RUNING if _isRuning else MOVEMENT_STATE.WALKING
 				else:
 					_state = MOVEMENT_STATE.IDLE
 
+
+
+		# Add the gravity for fall movement in y direction when detecting is not on floor
+		# Just after the next frame in a jump process
+		if not _myCharacter.is_on_floor() and not _JumpKeyPressed:
+			# we use the variable JumpKeyPressed for initializing the decrease of velocity just after pressed the jump key
+			_myCharacter.velocity += _myCharacter.get_gravity() * delta
+			# if the character is not on the floor and it is not because of a jumping process, it means is falling
+			if not _isJumping :
+				_isFalling = true
+		else:
+			# If is on the foor the character is not falling
+			_isFalling = false
+
+			# By ending the falling state we retrieve the previous movement state
+			if _isMoving:
+				_state = MOVEMENT_STATE.RUNING if _isRuning else MOVEMENT_STATE.WALKING
+			else:
+				_state = MOVEMENT_STATE.IDLE
+
+
+
 		# Changing the movement state when falling. It must be set here bacause if not by falling and walking/runing
 		# doesnt return to walking/runing
 		if _isFalling :
 			_state = MOVEMENT_STATE.FALLING
 
+
 		if _isJumping :
 			_state = MOVEMENT_STATE.JUMPING
+
+
+
+		# Establishing normalized direction of movement, inputs are not taken into account when jumping or falling
+		# That means the direction doesnt change until the jumping or falling process is over
+		# It could be also checked if the character is on floor
+		if not _isJumping and not _isFalling :
+			if not _existLeftInput or not _existRightInput:
+				if _existFrontInput and _existRearInput :
+					# Only front and rear direction
+					_inputDir = Vector2.DOWN * Input.get_axis(frontInput, rearInput)
+				else:
+					if _existFrontInput :
+						_inputDir = -Vector2.DOWN * Input.get_action_strength(frontInput)
+					else :
+						# None direction
+						_inputDir = Vector2.ZERO
+			elif not _existFrontInput or not _existRearInput :
+				# Only left and right direction
+				_inputDir = -Vector2.LEFT * Input.get_axis(leftInput, rightInput)
+			else:
+				# All directions
+				_inputDir = Input.get_vector(leftInput, rightInput, frontInput, rearInput)
+
+			# if there is no directionalObject defined we take the Character itself
+			
+			_direction = directionalObject.transform.basis * Vector3(_inputDir.x, 0, _inputDir.y).normalized() if directionalObject != null else _myCharacter.transform.basis * Vector3(_inputDir.x, 0, _inputDir.y).normalized()
+
+		# The direction change is detected when direction and previousdirection are different and it doesnt comes from being stopped
+		if _direction != _prevDirection :
+			_changedDirection = true
+			_prevDirection = _direction
+
+
+
 
 		# If inputs are present, that means if a movement direction is set
 		if _direction :
@@ -540,10 +562,10 @@ func _physics_process(delta: float) -> void:
 			
 			# Calculate the _speed it should move, only made once if there is a speed change
 			# Kept the previous speed to calculate the diference for speed transitions
-			if (_speed != RUN_SPEED) and _isRuning:
+			if (_speed != RUN_SPEED) and _isRuning :
 				_oldSpeed = _speed
 				_speed = RUN_SPEED
-			elif (_speed != WALK_SPEED) and not _isRuning:
+			elif (_speed != WALK_SPEED) and not _isRuning :
 				_oldSpeed = _speed
 				_speed = WALK_SPEED
 
@@ -568,17 +590,19 @@ func _physics_process(delta: float) -> void:
 			var _finalSpeed : Vector3 = _direction * _speed
 
 			# until the finalSpeed is arrived we increment the character's velocity by a step depending on diference between speeds and the accelerationSpeed in seg independently from the pc characteristics (delta)
-			if (_myCharacter.velocity !=_finalSpeed) :
+			if (_myCharacter.velocity != _finalSpeed) :
 
 				# If a changedDirection is detected and not is falling and not is jumping the velocity is set to the real speed so that it is not reduced or incremented via the accelerationSpeed or decelerationSpeed
 				# After that the bool variable changeDirection is set to false
-				if _changedDirection and not _isJumping and not _isFalling :
+				if (_changedDirection and not _isJumping and not _isFalling) :
 					if changeDirectionMode == CHANGEDIRECTION_MODE.CONTINOUS :
-						_myCharacter.velocity = _direction * _speed
+						_myCharacter.velocity = _finalSpeed
 					elif changeDirectionMode == CHANGEDIRECTION_MODE.FIFTY :
-						_myCharacter.velocity = _direction * _speed * 0.5
+						_myCharacter.velocity = _finalSpeed * 0.5
 					elif changeDirectionMode == CHANGEDIRECTION_MODE.RESET :
-						_myCharacter.velocity = Vector3.ZERO
+						_myCharacter.velocity = _finalSpeed * 0
+					elif changeDirectionMode == CHANGEDIRECTION_MODE.TRANSITIONED :
+						pass
 					_changedDirection = false
 
 				# Doing the speed increment via the accelerationSpeed
@@ -586,7 +610,7 @@ func _physics_process(delta: float) -> void:
 				_myCharacter.velocity.z = move_toward(_myCharacter.velocity.z, _finalSpeed.z, delta * abs(_speed - _oldSpeed) / _accelerationTime)
 
 		else:
-
+			# If we enter here it means the character is on floor and no input is present, we must reduce the velocity to zero
 			# When there is no input the speed is set to 0.0, only made once
 			# Kept the previous speed to calculate the diference for speed transitions
 			if _speed != 0.0 :
@@ -595,22 +619,32 @@ func _physics_process(delta: float) -> void:
 
 			# Deceleration when there is no input
 			# We arrive the zero velocity by a factor of decelerationSpeed seconds
-			
-			if (_myCharacter.velocity != Vector3.ZERO) :
-				# The speed is decrease via the decelerationSpeed
+
+			if _myCharacter.velocity.x != 0 or _myCharacter.velocity.z != 0 :
+
+				# The speed is decrease via the decelerationSpeed, the y component of the velocity can not be modified because it has to do with falling and jumping
+				# It can also happened if the character is stopped (falling when spawned) (jumping ok whe stooped)
 				_myCharacter.velocity.x = move_toward(_myCharacter.velocity.x, 0, delta * abs(_speed - _oldSpeed)  / _decelerationTime)
 				_myCharacter.velocity.z = move_toward(_myCharacter.velocity.z, 0, delta * abs(_speed - _oldSpeed) / _decelerationTime)
+
 			else:
-				# Seting the previous direction that is Vector3.ZERO
-				#_prevDirection = _direction
 				
-				# If bu decreasing the speed it arrives zero (it stops) the change direction flag is disabled
+				# If by decreasing the speed it arrives zero (it stops) the change direction flag is disabled
+				# so that the increasing of speed can be done independently of the changedirection mode
 				_changedDirection = false
 				
-				# Setting to false the ismoving flag to indicate that there is no movement
+				# Setting to false the ismoving flag to indicate that there is no x-z movement
 				set_isMoving(false)
+
+				# May be the character is falling or jumping but not moving
+				# When isFalling or isJumping the movement state is set before
 				if not _isFalling and not _isJumping:
 					_state = MOVEMENT_STATE.IDLE
+
+
+
+
+
 
 		# To avoid a weird reaction on character when pushes light objects i lock the y position
 		# when there is no need to move character up
@@ -619,6 +653,8 @@ func _physics_process(delta: float) -> void:
 			_myCharacter.axis_lock_linear_y = false
 		else :
 			_myCharacter.axis_lock_linear_y = true
+
+
 
 		# Doing the movement
 		# Using the method move_and_slide from CharacterBody3D node
@@ -843,21 +879,37 @@ func get_decelerationSpeed() -> float :
 # Gets the basic character movement context to translate it to another same type movement
 func get_context() -> BasicCharacterMovementData:
 	var context = BasicCharacterMovementData.new()
-	context.inputDir = get_inputDir()
-	context.runing = get_isRuning()
+	context.state = _state
+	context.changeDirection = _changedDirection
+	context.isRuning = get_isRuning()
+	context.isMoving = get_isMoving()
 	context.isPushing = get_isPushing()
-	context.isFalling = get_isFalling()
 	context.isJumping = get_isJumping()
+	context.JumpKeyPressed = _JumpKeyPressed
+	context.isFalling = get_isFalling()
+	context.isDoingRotation = get_isDoingRotation()
+	context.inputDir = get_inputDir()
+	context.prevDirection = _prevDirection
+	context.direction = _direction
+
 	return context
 
 
 # Sets the basic character movement context to translate it to another same type movement
 func set_context(context : BasicCharacterMovementData):
-	set_inputDir(context.inputDir)
-	set_isRuning(context.runing)
+	_state = context.state
+	_changedDirection = context.changeDirection
+	set_isRuning(context.isRuning)
+	set_isMoving(context.isMoving)
 	set_isPushing(context.isPushing)
 	set_isJumping(context.isJumping)
+	_JumpKeyPressed = context.JumpKeyPressed
 	set_isFalling(context.isFalling)
+	set_inputDir(context.inputDir)
+	_prevDirection = context.prevDirection
+	_direction = context.direction
+
+
 
 
 
