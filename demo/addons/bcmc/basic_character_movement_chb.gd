@@ -54,6 +54,21 @@ enum CHANGEDIRECTION_MODE {
 	TRANSITIONED
 }
 
+# Indicates the direction the character is moving can be used for animations
+# None means it is not moving
+enum DIRECTION_MODE {
+	NONE,
+	STRAIFLEFT,
+	LEFTFOR,
+	LEFTBACK,
+	STRAIFRIGHT,
+	RIGHTFOR,
+	RIGHTBACK,
+	FORWARD,
+	BACKWARD
+}
+
+
 
 ################################################################################################
 #                               E X P O R T E D   V A R I A B L E S
@@ -126,6 +141,10 @@ enum CHANGEDIRECTION_MODE {
 
 # Internal variable storing the offsets of each collision shape relative to the armature, calculated in _ready()
 var _collisionHullsArrayOffset : Array[float] = []
+
+#Indicates if the character should rotate or not, used if you want to provide with directional animations
+##Indicates if the character should rotate or not, used if you want to provide with directional animations
+@export var characterRotation : bool = true
 
 
 
@@ -338,6 +357,9 @@ var _decelerationTime : float
 # State of the Character's movement used typically in animation tree
 var _state : MOVEMENT_STATE = MOVEMENT_STATE.IDLE
 
+# State of the Character's direction movement used typically in animation tree
+var _direction_state : DIRECTION_MODE = DIRECTION_MODE.NONE
+
 
 # _speed accesible from outside get and set method
 # The _oldSpeed is the speed before a speed change, it is used to know the difference in a speed change for the right transition time
@@ -394,8 +416,6 @@ var _isDoingRotation : bool = false
 
 # Stores the actual direction
 var _direction : Vector3 = Vector3.ZERO
-
-
 
 
 # ==========================================================================================
@@ -527,17 +547,34 @@ func _physics_process(delta: float) -> void:
 				# All directions
 				_inputDir = Input.get_vector(leftInput, rightInput, frontInput, rearInput)
 
+			# Setting the direction the character is moving
+			match _inputDir :
+				Vector2(1,0) :
+					_direction_state = DIRECTION_MODE.STRAIFRIGHT
+				Vector2(-1,0) :
+					_direction_state = DIRECTION_MODE.STRAIFLEFT
+				Vector2(0,1) :
+					_direction_state = DIRECTION_MODE.BACKWARD
+				Vector2(0,-1) :
+					_direction_state = DIRECTION_MODE.FORWARD
+
+			# Nested if is used because the normalized vector is not a constant
+			if _inputDir == Vector2(1,1).normalized() :
+				_direction_state = DIRECTION_MODE.RIGHTBACK
+			elif _inputDir == Vector2(1,-1).normalized() :
+				_direction_state = DIRECTION_MODE.RIGHTFOR
+			elif _inputDir == Vector2(-1,1).normalized() :
+				_direction_state = DIRECTION_MODE.LEFTBACK
+			elif _inputDir == Vector2(-1,-1).normalized() :
+				_direction_state = DIRECTION_MODE.LEFTFOR
+
 			# if there is no directionalObject defined we take the Character itself
-			
 			_direction = directionalObject.transform.basis * Vector3(_inputDir.x, 0, _inputDir.y).normalized() if directionalObject != null else _myCharacter.transform.basis * Vector3(_inputDir.x, 0, _inputDir.y).normalized()
 
 		# The direction change is detected when direction and previousdirection are different and it doesnt comes from being stopped
 		if _direction != _prevDirection :
 			_changedDirection = true
 			_prevDirection = _direction
-
-
-
 
 		# If inputs are present, that means if a movement direction is set
 		if _direction :
@@ -638,11 +675,10 @@ func _physics_process(delta: float) -> void:
 
 				# May be the character is falling or jumping but not moving
 				# When isFalling or isJumping the movement state is set before
+				# The direction must be none independently if it is jumping or falling if it is not moving
+				_direction_state = DIRECTION_MODE.NONE
 				if not _isFalling and not _isJumping:
 					_state = MOVEMENT_STATE.IDLE
-
-
-
 
 
 
@@ -672,58 +708,61 @@ func _physics_process(delta: float) -> void:
 
 func _rotateArmature(armatureComponent : Node3D, oldRotationAngle : float, newRotationAngle : float, delta : float) -> void:
 
-	# How much it must rotate in each frame is between 0 and 1
-	var _step : float = delta / transitionTime
+	# Only if we want to rotate the character
+	if characterRotation : 
 
-	# We check the doingRotation flag once the rotateArmature movement begins
-	_isDoingRotation = true
+		# How much it must rotate in each frame is between 0 and 1
+		var _step : float = delta / transitionTime
 
-	# clamping rotations between -PI and PI
-	if (oldRotationAngle > PI):
-		oldRotationAngle = oldRotationAngle - 2*PI
-	if (oldRotationAngle < -PI):
-		oldRotationAngle = oldRotationAngle + 2*PI
-	if (newRotationAngle > PI):
-		newRotationAngle = newRotationAngle - 2*PI
-	if (newRotationAngle < -PI):
-		newRotationAngle = newRotationAngle + 2*PI
+		# We check the doingRotation flag once the rotateArmature movement begins
+		_isDoingRotation = true
 
-	# Adjusting rotations to take the shortest way
-	if abs(newRotationAngle - oldRotationAngle) > PI:
-		if oldRotationAngle > 0:
+		# clamping rotations between -PI and PI
+		if (oldRotationAngle > PI):
 			oldRotationAngle = oldRotationAngle - 2*PI
-		else:
+		if (oldRotationAngle < -PI):
 			oldRotationAngle = oldRotationAngle + 2*PI
+		if (newRotationAngle > PI):
+			newRotationAngle = newRotationAngle - 2*PI
+		if (newRotationAngle < -PI):
+			newRotationAngle = newRotationAngle + 2*PI
 
-	# Loop until get the last value of the lerp
-	while (_step < 1):
+		# Adjusting rotations to take the shortest way
+		if abs(newRotationAngle - oldRotationAngle) > PI:
+			if oldRotationAngle > 0:
+				oldRotationAngle = oldRotationAngle - 2*PI
+			else:
+				oldRotationAngle = oldRotationAngle + 2*PI
 
-		# if the Character changes the coroutine stops
-		if not is_inside_tree():
-			# Breaking the loop to be able to change the _isDoingRotation flag
-			break
+		# Loop until get the last value of the lerp
+		while (_step < 1):
 
-		# Rotation to apply in this frame
-		var x : float = lerp(oldRotationAngle,newRotationAngle, _step)
-		armatureComponent.rotation.y=-x
+			# if the Character changes the coroutine stops
+			if not is_inside_tree():
+				# Breaking the loop to be able to change the _isDoingRotation flag
+				break
 
-		# Also the shapes indicated must be rotated
-		var index : int = 0
-		for collisionHull in collisionHullsArray :
-			# The position of the shape calculation
-			collisionHull.position = -armatureComponent.basis.z.normalized() * _collisionHullsArrayOffset[index] + Vector3(0,collisionHull.position.y,0)
-			# The rotation of the shape calculation
-			collisionHull.rotation.y = -x
-			index += 1
+			# Rotation to apply in this frame
+			var x : float = lerp(oldRotationAngle,newRotationAngle, _step)
+			armatureComponent.rotation.y=-x
 
-		# As it is used lerp the _step must be increased for the next frame
-		_step += delta / transitionTime
+			# Also the shapes indicated must be rotated
+			var index : int = 0
+			for collisionHull in collisionHullsArray :
+				# The position of the shape calculation
+				collisionHull.position = -armatureComponent.basis.z.normalized() * _collisionHullsArrayOffset[index] + Vector3(0,collisionHull.position.y,0)
+				# The rotation of the shape calculation
+				collisionHull.rotation.y = -x
+				index += 1
 
-		# Corroutine stoping function when frame's end comes
-		await  get_tree().physics_frame
+			# As it is used lerp the _step must be increased for the next frame
+			_step += delta / transitionTime
 
-	# Now i can make another rotation move
-	_isDoingRotation = false
+			# Corroutine stoping function when frame's end comes
+			await  get_tree().physics_frame
+
+		# Now i can make another rotation move
+		_isDoingRotation = false
 
 
 # This function detects a collision and push the rigidbodies involved
@@ -775,6 +814,9 @@ func _pushAwwayRigidbody() -> void :
 func get_state() -> MOVEMENT_STATE:
 	return _state
 
+# Returns the state of the character movement
+func get_directionstate() -> DIRECTION_MODE:
+	return _direction_state
 
 # methods to check, start and stop the movement. For example to make an animation that requires to stop the movement
 func get_isMoving() -> bool :
@@ -880,6 +922,7 @@ func get_decelerationSpeed() -> float :
 func get_context() -> BasicCharacterMovementData:
 	var context = BasicCharacterMovementData.new()
 	context.state = _state
+	context.directionstate = _direction_state
 	context.changeDirection = _changedDirection
 	context.isRuning = get_isRuning()
 	context.isMoving = get_isMoving()
@@ -898,6 +941,7 @@ func get_context() -> BasicCharacterMovementData:
 # Sets the basic character movement context to translate it to another same type movement
 func set_context(context : BasicCharacterMovementData):
 	_state = context.state
+	_direction_state = context.directionstate
 	_changedDirection = context.changeDirection
 	set_isRuning(context.isRuning)
 	set_isMoving(context.isMoving)

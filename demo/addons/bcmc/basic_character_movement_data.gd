@@ -3,6 +3,7 @@
 class_name BasicCharacterMovementData extends Node
 
 var state : BasicCharacterMovementComponent.MOVEMENT_STATE = BasicCharacterMovementComponent.MOVEMENT_STATE.IDLE
+var directionstate : BasicCharacterMovementComponent.DIRECTION_MODE = BasicCharacterMovementComponent.DIRECTION_MODE.NONE
 var changeDirection : BasicCharacterMovementComponent.CHANGEDIRECTION_MODE = BasicCharacterMovementComponent.CHANGEDIRECTION_MODE.FIFTY
 var isRuning : bool = false
 var isMoving : bool = false
